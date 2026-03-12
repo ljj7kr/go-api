@@ -1,0 +1,13 @@
+.env
+.env.*
+.gocache/
+.idea/
+
+bin/
+server
+
+*.log
+.DS_Store
+coverage.out
+*.test
+tmp/
