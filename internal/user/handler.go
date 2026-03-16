@@ -18,7 +18,9 @@ type Handler struct {
 type ServiceInterface interface {
 	CreateUser(ctx context.Context, input CreateUserRequest) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
+	UpdateUser(ctx context.Context, id int64, input UpdateUserRequest) (User, error)
 	ListUsers(ctx context.Context, input ListUsersRequest) (ListUsersResult, error)
+	DeleteUser(ctx context.Context, id int64) error
 }
 
 func NewHandler(service ServiceInterface) *Handler {
@@ -36,10 +38,15 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request, params opena
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, openapi.ListUsersResponse{
-		HasNext: result.HasNext,
-		Items:   toUserResponses(result.Items),
-		Page:    result.Page,
-		Size:    result.Size,
+		Items: toUserResponses(result.Items),
+		Pagination: openapi.PaginationResponse{
+			Page:          result.Page,
+			Size:          result.Size,
+			TotalPages:    result.TotalPages,
+			TotalElements: result.TotalCount,
+			HasNext:       result.HasNext,
+			HasPrevious:   result.HasPrev,
+		},
 	})
 }
 
@@ -62,6 +69,25 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusCreated, toUserResponse(createdUser))
 }
 
+func (h *Handler) UpdateUserByID(w http.ResponseWriter, r *http.Request, id int64) {
+	var req openapi.UpdateUserRequest
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "INVALID_REQUEST", "잘못된 요청입니다", nil)
+		return
+	}
+
+	updatedUser, err := h.service.UpdateUser(r.Context(), id, UpdateUserRequest{
+		Name:  req.Name,
+		Email: string(req.Email),
+	})
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toUserResponse(updatedUser))
+}
+
 func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request, id int64) {
 	foundUser, err := h.service.GetUserByID(r.Context(), id)
 	if err != nil {
@@ -70,6 +96,15 @@ func (h *Handler) GetUserByID(w http.ResponseWriter, r *http.Request, id int64) 
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, toUserResponse(foundUser))
+}
+
+func (h *Handler) DeleteUserByID(w http.ResponseWriter, r *http.Request, id int64) {
+	if err := h.service.DeleteUser(r.Context(), id); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) writeServiceError(w http.ResponseWriter, err error) {

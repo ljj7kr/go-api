@@ -12,6 +12,10 @@ type listUsersRepoStub struct {
 	users     []User
 	listInput ListUsersInput
 	listErr   error
+	total     int64
+	countErr  error
+	updateErr error
+	deleteErr error
 }
 
 func (s *listUsersRepoStub) CreateUser(_ context.Context, _ CreateUserInput) (int64, error) {
@@ -20,6 +24,18 @@ func (s *listUsersRepoStub) CreateUser(_ context.Context, _ CreateUserInput) (in
 
 func (s *listUsersRepoStub) GetUserByID(_ context.Context, _ int64) (User, error) {
 	return User{}, errors.New("not implemented")
+}
+
+func (s *listUsersRepoStub) UpdateUser(_ context.Context, _ UpdateUserInput) error {
+	return s.updateErr
+}
+
+func (s *listUsersRepoStub) CountUsers(_ context.Context) (int64, error) {
+	if s.countErr != nil {
+		return 0, s.countErr
+	}
+
+	return s.total, nil
 }
 
 func (s *listUsersRepoStub) ListUsers(_ context.Context, input ListUsersInput) ([]User, error) {
@@ -31,6 +47,10 @@ func (s *listUsersRepoStub) ListUsers(_ context.Context, input ListUsersInput) (
 	return s.users, nil
 }
 
+func (s *listUsersRepoStub) DeleteUser(_ context.Context, _ int64) error {
+	return s.deleteErr
+}
+
 func Test사용자목록조회시_기본페이지네이션을_적용한다(t *testing.T) {
 	t.Parallel()
 
@@ -39,6 +59,7 @@ func Test사용자목록조회시_기본페이지네이션을_적용한다(t *te
 			{ID: 3, Name: "세번째", Email: "3@example.com", CreatedAt: time.Unix(3, 0)},
 			{ID: 2, Name: "두번째", Email: "2@example.com", CreatedAt: time.Unix(2, 0)},
 		},
+		total: 2,
 	}
 	service := NewService(repo)
 
@@ -55,6 +76,15 @@ func Test사용자목록조회시_기본페이지네이션을_적용한다(t *te
 	}
 	if result.HasNext {
 		t.Fatalf("unexpected hasNext: got true")
+	}
+	if result.TotalCount != 2 {
+		t.Fatalf("unexpected total count: got %d", result.TotalCount)
+	}
+	if result.TotalPages != 1 {
+		t.Fatalf("unexpected total pages: got %d", result.TotalPages)
+	}
+	if result.HasPrev {
+		t.Fatalf("unexpected hasPrevious: got true")
 	}
 	if repo.listInput.Limit != 21 {
 		t.Fatalf("unexpected limit: got %d", repo.listInput.Limit)
@@ -76,6 +106,7 @@ func Test사용자목록조회시_다음페이지여부를_계산한다(t *testi
 			{ID: 8, Name: "여덟", Email: "8@example.com", CreatedAt: time.Unix(8, 0)},
 			{ID: 7, Name: "일곱", Email: "7@example.com", CreatedAt: time.Unix(7, 0)},
 		},
+		total: 5,
 	}
 	service := NewService(repo)
 
@@ -89,6 +120,15 @@ func Test사용자목록조회시_다음페이지여부를_계산한다(t *testi
 
 	if !result.HasNext {
 		t.Fatalf("unexpected hasNext: got false")
+	}
+	if !result.HasPrev {
+		t.Fatalf("unexpected hasPrevious: got false")
+	}
+	if result.TotalCount != 5 {
+		t.Fatalf("unexpected total count: got %d", result.TotalCount)
+	}
+	if result.TotalPages != 3 {
+		t.Fatalf("unexpected total pages: got %d", result.TotalPages)
 	}
 	if repo.listInput.Limit != 3 {
 		t.Fatalf("unexpected limit: got %d", repo.listInput.Limit)

@@ -40,10 +40,24 @@ type HealthResponse struct {
 
 // ListUsersResponse defines model for ListUsersResponse.
 type ListUsersResponse struct {
-	HasNext bool           `json:"hasNext"`
-	Items   []UserResponse `json:"items"`
-	Page    int            `json:"page"`
-	Size    int            `json:"size"`
+	Items      []UserResponse     `json:"items"`
+	Pagination PaginationResponse `json:"pagination"`
+}
+
+// PaginationResponse defines model for PaginationResponse.
+type PaginationResponse struct {
+	HasNext       bool  `json:"has_next"`
+	HasPrevious   bool  `json:"has_previous"`
+	Page          int   `json:"page"`
+	Size          int   `json:"size"`
+	TotalElements int64 `json:"total_elements"`
+	TotalPages    int   `json:"total_pages"`
+}
+
+// UpdateUserRequest defines model for UpdateUserRequest.
+type UpdateUserRequest struct {
+	Email openapi_types.Email `json:"email"`
+	Name  string              `json:"name"`
 }
 
 // UserResponse defines model for UserResponse.
@@ -69,6 +83,9 @@ type ListUsersParams struct {
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = CreateUserRequest
 
+// UpdateUserByIdJSONRequestBody defines body for UpdateUserById for application/json ContentType.
+type UpdateUserByIdJSONRequestBody = UpdateUserRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// 헬스체크
@@ -80,9 +97,15 @@ type ServerInterface interface {
 	// 사용자 생성
 	// (POST /users)
 	CreateUser(w http.ResponseWriter, r *http.Request)
+	// 사용자 삭제
+	// (DELETE /users/{id})
+	DeleteUserById(w http.ResponseWriter, r *http.Request, id UserIdPath)
 	// 사용자 단건 조회
 	// (GET /users/{id})
 	GetUserById(w http.ResponseWriter, r *http.Request, id UserIdPath)
+	// 사용자 수정
+	// (PUT /users/{id})
+	UpdateUserById(w http.ResponseWriter, r *http.Request, id UserIdPath)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -157,6 +180,31 @@ func (siw *ServerInterfaceWrapper) CreateUser(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteUserById operation middleware
+func (siw *ServerInterfaceWrapper) DeleteUserById(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id UserIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteUserById(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetUserById operation middleware
 func (siw *ServerInterfaceWrapper) GetUserById(w http.ResponseWriter, r *http.Request) {
 
@@ -173,6 +221,31 @@ func (siw *ServerInterfaceWrapper) GetUserById(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetUserById(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateUserById operation middleware
+func (siw *ServerInterfaceWrapper) UpdateUserById(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id UserIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateUserById(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -305,7 +378,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("GET "+options.BaseURL+"/health", wrapper.GetHealth)
 	m.HandleFunc("GET "+options.BaseURL+"/users", wrapper.ListUsers)
 	m.HandleFunc("POST "+options.BaseURL+"/users", wrapper.CreateUser)
+	m.HandleFunc("DELETE "+options.BaseURL+"/users/{id}", wrapper.DeleteUserById)
 	m.HandleFunc("GET "+options.BaseURL+"/users/{id}", wrapper.GetUserById)
+	m.HandleFunc("PUT "+options.BaseURL+"/users/{id}", wrapper.UpdateUserById)
 
 	return m
 }

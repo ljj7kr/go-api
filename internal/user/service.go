@@ -15,8 +15,11 @@ var ErrDuplicateUserEmail = errors.New("duplicate user email")
 
 type Repository interface {
 	CreateUser(ctx context.Context, input CreateUserInput) (int64, error)
+	CountUsers(ctx context.Context) (int64, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
+	UpdateUser(ctx context.Context, input UpdateUserInput) error
 	ListUsers(ctx context.Context, input ListUsersInput) ([]User, error)
+	DeleteUser(ctx context.Context, id int64) error
 }
 
 type Service struct {
@@ -78,6 +81,38 @@ func (s *Service) GetUserByID(ctx context.Context, id int64) (User, error) {
 	return s.repo.GetUserByID(ctx, id)
 }
 
+func (s *Service) UpdateUser(ctx context.Context, id int64, input UpdateUserRequest) (User, error) {
+	if id < 1 {
+		return User{}, &InvalidInputError{
+			Details: []FieldError{
+				{
+					Field:  "id",
+					Reason: "must be greater than or equal to 1",
+				},
+			},
+		}
+	}
+
+	if err := s.validate.Struct(input); err != nil {
+		return User{}, newInvalidInputError(err)
+	}
+
+	if err := s.repo.UpdateUser(ctx, UpdateUserInput{
+		ID:    id,
+		Name:  input.Name,
+		Email: input.Email,
+	}); err != nil {
+		return User{}, err
+	}
+
+	updatedUser, err := s.repo.GetUserByID(ctx, id)
+	if err != nil {
+		return User{}, fmt.Errorf("get updated user: %w", err)
+	}
+
+	return updatedUser, nil
+}
+
 func (s *Service) ListUsers(ctx context.Context, input ListUsersRequest) (ListUsersResult, error) {
 	if input.Page == 0 {
 		input.Page = 1
@@ -112,18 +147,46 @@ func (s *Service) ListUsers(ctx context.Context, input ListUsersRequest) (ListUs
 		return ListUsersResult{}, err
 	}
 
+	totalCount, err := s.repo.CountUsers(ctx)
+	if err != nil {
+		return ListUsersResult{}, err
+	}
+
 	hasNext := len(users) > int(input.Size)
 	if hasNext {
 		// 응답에는 요청한 크기만 포함
 		users = users[:input.Size]
 	}
 
+	totalPages := 0
+	if totalCount > 0 {
+		totalPages = int((totalCount + int64(input.Size) - 1) / int64(input.Size))
+	}
+
 	return ListUsersResult{
-		Items:   users,
-		Page:    input.Page,
-		Size:    input.Size,
-		HasNext: hasNext,
+		Items:      users,
+		Page:       input.Page,
+		Size:       input.Size,
+		TotalCount: totalCount,
+		TotalPages: totalPages,
+		HasNext:    hasNext,
+		HasPrev:    input.Page > 1,
 	}, nil
+}
+
+func (s *Service) DeleteUser(ctx context.Context, id int64) error {
+	if id < 1 {
+		return &InvalidInputError{
+			Details: []FieldError{
+				{
+					Field:  "id",
+					Reason: "must be greater than or equal to 1",
+				},
+			},
+		}
+	}
+
+	return s.repo.DeleteUser(ctx, id)
 }
 
 func newInvalidInputError(err error) error {

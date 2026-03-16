@@ -21,6 +21,13 @@ FROM users
 WHERE email = ?;
 
 
+-- name: UpdateUser :execresult
+UPDATE users
+SET name = ?,
+    email = ?
+WHERE id = ?;
+
+
 -- name: ListUsers :many
 SELECT id,
        name,
@@ -31,7 +38,12 @@ ORDER BY id DESC LIMIT ?
 OFFSET ?;
 
 
--- name: DeleteUser :exec
+-- name: CountUsers :one
+SELECT COUNT(*)
+FROM users;
+
+
+-- name: DeleteUser :execresult
 DELETE
 FROM users
 WHERE id = ?;

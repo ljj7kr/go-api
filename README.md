@@ -61,6 +61,8 @@ make run
 - `GET /users?page=1&size=20`
 - `POST /users`
 - `GET /users/{id}`
+- `PUT /users/{id}`
+- `DELETE /users/{id}`
 
 ### 목록 조회 응답 예시
 
@@ -74,11 +76,27 @@ make run
       "createdAt": "2026-03-12T10:00:00Z"
     }
   ],
-  "page": 1,
-  "size": 20,
-  "hasNext": false
+  "pagination": {
+    "page": 1,
+    "size": 20,
+    "total_elements": 1,
+    "total_pages": 1,
+    "has_next": false,
+    "has_previous": false
+  }
 }
 ```
+
+### 수정 요청 예시
+
+```json
+{
+  "name": "홍길동",
+  "email": "hong@example.com"
+}
+```
+
+삭제 성공 시에는 `204 No Content` 를 반환한다
 
 ## 코드 생성
 

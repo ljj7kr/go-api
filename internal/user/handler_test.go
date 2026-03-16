@@ -25,6 +25,10 @@ func (s *handlerServiceStub) GetUserByID(_ context.Context, _ int64) (User, erro
 	return User{}, errors.New("not implemented")
 }
 
+func (s *handlerServiceStub) UpdateUser(_ context.Context, _ int64, _ UpdateUserRequest) (User, error) {
+	return User{}, errors.New("not implemented")
+}
+
 func (s *handlerServiceStub) ListUsers(_ context.Context, _ ListUsersRequest) (ListUsersResult, error) {
 	if s.listErr != nil {
 		return ListUsersResult{}, s.listErr
@@ -33,14 +37,21 @@ func (s *handlerServiceStub) ListUsers(_ context.Context, _ ListUsersRequest) (L
 	return s.listResult, nil
 }
 
+func (s *handlerServiceStub) DeleteUser(_ context.Context, _ int64) error {
+	return errors.New("not implemented")
+}
+
 func Test사용자목록핸들러는_페이지응답을_반환한다(t *testing.T) {
 	t.Parallel()
 
 	handler := NewHandler(&handlerServiceStub{
 		listResult: ListUsersResult{
-			Page:    1,
-			Size:    2,
-			HasNext: true,
+			Page:       1,
+			Size:       2,
+			TotalCount: 3,
+			TotalPages: 2,
+			HasNext:    true,
+			HasPrev:    false,
 			Items: []User{
 				{ID: 11, Name: "열하나", Email: "11@example.com", CreatedAt: time.Unix(11, 0).UTC()},
 				{ID: 10, Name: "열", Email: "10@example.com", CreatedAt: time.Unix(10, 0).UTC()},
@@ -65,11 +76,20 @@ func Test사용자목록핸들러는_페이지응답을_반환한다(t *testing.
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
-	if result.Page != 1 || result.Size != 2 {
-		t.Fatalf("unexpected paging info: page=%d size=%d", result.Page, result.Size)
+	if result.Pagination.Page != 1 || result.Pagination.Size != 2 {
+		t.Fatalf("unexpected paging info: page=%d size=%d", result.Pagination.Page, result.Pagination.Size)
 	}
-	if !result.HasNext {
+	if result.Pagination.TotalElements != 3 {
+		t.Fatalf("unexpected total elements: got %d", result.Pagination.TotalElements)
+	}
+	if result.Pagination.TotalPages != 2 {
+		t.Fatalf("unexpected total pages: got %d", result.Pagination.TotalPages)
+	}
+	if !result.Pagination.HasNext {
 		t.Fatalf("unexpected hasNext: got false")
+	}
+	if result.Pagination.HasPrevious {
+		t.Fatalf("unexpected hasPrevious: got true")
 	}
 	if len(result.Items) != 2 {
 		t.Fatalf("unexpected item count: got %d", len(result.Items))

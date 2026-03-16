@@ -28,6 +28,13 @@ type CreateUserInput struct {
 	Email string
 }
 
+// UpdateUserInput 은 사용자 수정 입력값이다
+type UpdateUserInput struct {
+	ID    int64
+	Name  string
+	Email string
+}
+
 // ListUsersInput 은 목록 조회 입력값이다
 type ListUsersInput struct {
 	Limit  int32
@@ -94,6 +101,32 @@ func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (User
 	return toUser(row), nil
 }
 
+// UpdateUser 는 사용자를 수정한다
+func (r *UserRepository) UpdateUser(ctx context.Context, input UpdateUserInput) error {
+	res, err := r.q.UpdateUser(ctx, gen.UpdateUserParams{
+		Name:  input.Name,
+		Email: input.Email,
+		ID:    input.ID,
+	})
+	if err != nil {
+		var mysqlErr *mysqlDriver.MySQLError
+		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+			return ErrDuplicateUserEmail
+		}
+		return fmt.Errorf("update user: %w", err)
+	}
+
+	affectedRows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("get update affected rows: %w", err)
+	}
+	if affectedRows == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}
+
 // ListUsers 는 사용자 목록을 조회한다
 func (r *UserRepository) ListUsers(ctx context.Context, input ListUsersInput) ([]User, error) {
 	rows, err := r.q.ListUsers(ctx, gen.ListUsersParams{
@@ -112,11 +145,31 @@ func (r *UserRepository) ListUsers(ctx context.Context, input ListUsersInput) ([
 	return users, nil
 }
 
+// CountUsers 는 전체 사용자 수를 조회한다
+func (r *UserRepository) CountUsers(ctx context.Context) (int64, error) {
+	count, err := r.q.CountUsers(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("count users: %w", err)
+	}
+
+	return count, nil
+}
+
 // DeleteUser 는 사용자를 삭제한다
 func (r *UserRepository) DeleteUser(ctx context.Context, id int64) error {
-	if err := r.q.DeleteUser(ctx, id); err != nil {
+	res, err := r.q.DeleteUser(ctx, id)
+	if err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}
+
+	affectedRows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("get delete affected rows: %w", err)
+	}
+	if affectedRows == 0 {
+		return ErrUserNotFound
+	}
+
 	return nil
 }
 

@@ -35,3 +35,11 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetUserById(w http.ResponseWriter, r *http.Request, id int64) {
 	h.userHandler.GetUserByID(w, r, id)
 }
+
+func (h *Handler) UpdateUserById(w http.ResponseWriter, r *http.Request, id int64) {
+	h.userHandler.UpdateUserByID(w, r, id)
+}
+
+func (h *Handler) DeleteUserById(w http.ResponseWriter, r *http.Request, id int64) {
+	h.userHandler.DeleteUserByID(w, r, id)
+}

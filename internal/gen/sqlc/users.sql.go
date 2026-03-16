@@ -10,6 +10,18 @@ import (
 	"database/sql"
 )
 
+const countUsers = `-- name: CountUsers :one
+SELECT COUNT(*)
+FROM users
+`
+
+func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countUsers)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createUser = `-- name: CreateUser :execresult
 INSERT INTO users (name, email)
 VALUES (?, ?)
@@ -24,15 +36,14 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (sql.Res
 	return q.db.ExecContext(ctx, createUser, arg.Name, arg.Email)
 }
 
-const deleteUser = `-- name: DeleteUser :exec
+const deleteUser = `-- name: DeleteUser :execresult
 DELETE
 FROM users
 WHERE id = ?
 `
 
-func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteUser, id)
-	return err
+func (q *Queries) DeleteUser(ctx context.Context, id int64) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteUser, id)
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
@@ -118,4 +129,21 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateUser = `-- name: UpdateUser :execresult
+UPDATE users
+SET name = ?,
+    email = ?
+WHERE id = ?
+`
+
+type UpdateUserParams struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	ID    int64  `json:"id"`
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateUser, arg.Name, arg.Email, arg.ID)
 }
